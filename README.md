@@ -1,2 +1,2 @@
-# AIResident-EMa
-Natural Query Agent Development
+# Email Enrichment App
+
