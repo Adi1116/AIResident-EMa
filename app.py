@@ -2,18 +2,32 @@ import streamlit as st
 import pandas as pd
 import requests
 import time
+from datetime import datetime
 
 # Set up user credentials
 USERS = {
-    "user1": "password1",
-    "user2": "password2",
+    "user1@example.com": "password1",
+    "user2@example.com": "password2",
 }
 
 # Define login function
-def login(username, password):
-    if username in USERS and USERS[username] == password:
+def login(email, password):
+    if email in USERS and USERS[email] == password:
         return True
     return False
+
+# Log user data
+def log_user_data(email):
+    login_data = {
+        "email": email,
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    try:
+        log_df = pd.read_csv('user_log.csv')
+    except FileNotFoundError:
+        log_df = pd.DataFrame(columns=["email", "timestamp"])
+    log_df = log_df.append(login_data, ignore_index=True)
+    log_df.to_csv('user_log.csv', index=False)
 
 # Check if the user is logged in
 if "logged_in" not in st.session_state:
@@ -22,14 +36,15 @@ if "logged_in" not in st.session_state:
 # Login page
 if not st.session_state.logged_in:
     st.title("Login")
-    username = st.text_input("Username")
+    email = st.text_input("Email")
     password = st.text_input("Password", type="password")
     if st.button("Login"):
-        if login(username, password):
+        if login(email, password):
             st.session_state.logged_in = True
+            log_user_data(email)
             st.experimental_rerun()
         else:
-            st.error("Username or password is incorrect")
+            st.error("Email or password is incorrect")
 else:
     # Main App Code
     st.title("Email Enrichment App")
