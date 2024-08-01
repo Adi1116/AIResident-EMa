@@ -1,95 +1,123 @@
-#pip install -r requirements.txt
-
 import streamlit as st
 import pandas as pd
 import requests
 import time
-st.title("Email Enrichment App")
 
-# Upload CSV file
-uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
+# Set up user credentials
+USERS = {
+    "user1": "password1",
+    "user2": "password2",
+}
 
-if uploaded_file:
-    df = pd.read_csv(uploaded_file)
+# Define login function
+def login(username, password):
+    if username in USERS and USERS[username] == password:
+        return True
+    return False
 
-    url_column = 'LinkedIn_Profile_Url'
-    url = "https://api.apollo.io/api/v1/people/bulk_match"
+# Check if the user is logged in
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
 
-    headers = {
-        'Cache-Control': 'no-cache',
-        'Content-Type': 'application/json',
-        'X-Api-Key': 'Qu-V9RSUsbmUHYaFLkflYg'
-    }
-
-    def make_api_request(details_batch):
-        data = {
-            "reveal_personal_emails": True,
-            "details": details_batch
-        }
-        response = requests.request("POST", url, headers=headers, json=data)
-        return response.json()
-
-    def enrich_emails(start_index, batch_size=10):
-        end_index = min(start_index + batch_size, len(df))
-        batch = df[url_column][start_index:end_index]
-        details = [{"linkedin_url": url} for url in batch]
-        response_data = make_api_request(details)
-
-        emails_data = []
-        if response_data.get('status') != 'success':
-            st.error("API call failed: " + response_data.get('error_message'))
+# Login page
+if not st.session_state.logged_in:
+    st.title("Login")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+    if st.button("Login"):
+        if login(username, password):
+            st.session_state.logged_in = True
+            st.experimental_rerun()
         else:
-            for match in response_data.get('matches', []):
-                if match:
-                    email = match.get('email')
-                    personal_emails = match.get('personal_emails', [])
-                    emails_data.append({
-                        'Email': email,
-                        'Personal Emails': personal_emails
-                    })
-                else:
-                    emails_data.append({
-                        'Email': None,
-                        'Personal Emails': None
-                    })
+            st.error("Username or password is incorrect")
+else:
+    # Main App Code
+    st.title("Email Enrichment App")
 
-        emails_df = pd.DataFrame(emails_data, index=batch.index)
-        df.loc[start_index:end_index-1, 'Email'] = emails_df['Email']
-        df.loc[start_index:end_index-1, 'Personal Emails'] = emails_df['Personal Emails']
+    # Upload CSV file
+    uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
 
-    def process_batches(batch_size=10, minute_limit=200, hour_limit=400):
-        start_index = 0
-        minute_count = 0
-        hour_count = 0
+    if uploaded_file:
+        df = pd.read_csv(uploaded_file)
 
-        while start_index < len(df):
-            enrich_emails(start_index, batch_size)
-            start_index += batch_size
-            minute_count += batch_size
-            hour_count += batch_size
+        url_column = 'LinkedIn_Profile_Url'
+        url = "https://api.apollo.io/api/v1/people/bulk_match"
 
-            # Wait for 1 second after each batch of 10
-            time.sleep(1)
+        headers = {
+            'Cache-Control': 'no-cache',
+            'Content-Type': 'application/json',
+            'X-Api-Key': 'Qu-V9RSUsbmUHYaFLkflYg'
+        }
 
-            # Check if we reached the minute limit
-            if minute_count >= minute_limit:
-                time.sleep(60 - (minute_count // 10))
-                minute_count = 0
+        def make_api_request(details_batch):
+            data = {
+                "reveal_personal_emails": True,
+                "details": details_batch
+            }
+            response = requests.request("POST", url, headers=headers, json=data)
+            return response.json()
 
-            # Check if we reached the hour limit
-            if hour_count >= hour_limit:
-                time.sleep(3600 - (hour_count // 10))
-                hour_count = 0
+        def enrich_emails(start_index, batch_size=10):
+            end_index = min(start_index + batch_size, len(df))
+            batch = df[url_column][start_index:end_index]
+            details = [{"linkedin_url": url} for url in batch]
+            response_data = make_api_request(details)
 
-    if st.button("Enrich Emails"):
-        with st.spinner("Enriching emails..."):
-            process_batches()
-            st.success("Email enrichment completed!")
-            st.dataframe(df)
-            df.to_csv('OUTPUT.csv', index=False)
-            st.download_button(
-                label="Download Enriched CSV",
-                data=open('OUTPUT.csv', 'rb').read(),
-                file_name='OUTPUT.csv',
-                mime='text/csv'
-            )
+            emails_data = []
+            if response_data.get('status') != 'success':
+                st.error("API call failed: " + response_data.get('error_message'))
+            else:
+                for match in response_data.get('matches', []):
+                    if match:
+                        email = match.get('email')
+                        personal_emails = match.get('personal_emails', [])
+                        emails_data.append({
+                            'Email': email,
+                            'Personal Emails': personal_emails
+                        })
+                    else:
+                        emails_data.append({
+                            'Email': None,
+                            'Personal Emails': None
+                        })
+
+            emails_df = pd.DataFrame(emails_data, index=batch.index)
+            df.loc[start_index:end_index-1, 'Email'] = emails_df['Email']
+            df.loc[start_index:end_index-1, 'Personal Emails'] = emails_df['Personal Emails']
+
+        def process_batches(batch_size=10, minute_limit=200, hour_limit=400):
+            start_index = 0
+            minute_count = 0
+            hour_count = 0
+
+            while start_index < len(df):
+                enrich_emails(start_index, batch_size)
+                start_index += batch_size
+                minute_count += batch_size
+                hour_count += batch_size
+
+                # Wait for 1 second after each batch of 10
+                time.sleep(1)
+
+                # Check if we reached the minute limit
+                if minute_count >= minute_limit:
+                    time.sleep(60 - (minute_count // 10))
+                    minute_count = 0
+
+                # Check if we reached the hour limit
+                if hour_count >= hour_limit:
+                    time.sleep(3600 - (hour_count // 10))
+                    hour_count = 0
+
+        if st.button("Enrich Emails"):
+            with st.spinner("Enriching emails..."):
+                process_batches()
+                st.success("Email enrichment completed!")
+                st.dataframe(df)
+                df.to_csv('OUTPUT.csv', index=False)
+                st.download_button(
+                    label="Download Enriched CSV",
+                    data=open('OUTPUT.csv', 'rb').read(),
+                    file_name='OUTPUT.csv',
+                    mime='text/csv'
+                )
