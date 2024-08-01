@@ -86,12 +86,12 @@ else:
                     if match:
                         email = match.get('email')
                         personal_emails = match.get('personal_emails', [])
-                        emails_data.append({
+                        emails_data._append({
                             'Email': email,
                             'Personal Emails': personal_emails
                         })
                     else:
-                        emails_data.append({
+                        emails_data._append({
                             'Email': None,
                             'Personal Emails': None
                         })
