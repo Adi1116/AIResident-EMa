@@ -26,7 +26,7 @@ def log_user_data(email):
         log_df = pd.read_csv('user_log.csv')
     except FileNotFoundError:
         log_df = pd.DataFrame(columns=["email", "timestamp"])
-    log_df = log_df.append(login_data, ignore_index=True)
+    log_df = log_df._append(login_data, ignore_index=True)
     log_df.to_csv('user_log.csv', index=False)
 
 # Check if the user is logged in
